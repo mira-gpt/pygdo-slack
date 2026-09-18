@@ -140,6 +140,8 @@ class Slack(Connector):
             await channel.on_user_joined(user)
         else:
             await channel.on_user_left(user)
+            if not self._server.get_channels_for_user(user):
+                await self._server.on_user_quit(user)
 
     async def bootstrap_channels(self):
         """Register visible public channels so Dog can send before first inbound text."""
@@ -181,6 +183,9 @@ class Slack(Connector):
         user = await self._server.get_or_create_user(user_id, user_name)
         Application.set_current_user(user)
         channel = self._server.get_or_create_channel(channel_id, channel_name)
+        # A message may arrive without the optional membership event.  Keep
+        # the connector-wide and channel-local presence snapshots coherent.
+        await self._server.on_user_joined(user, channel)
         await channel.on_user_joined(user)
         message = Message(text, Mode.render_markdown)
         message.env_server(self._server)
