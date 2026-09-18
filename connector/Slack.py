@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from slack_sdk.socket_mode.aiohttp import SocketModeClient
@@ -86,12 +85,8 @@ class Slack(Connector):
     def gdo_get_dog_user(self) -> GDO_User | None:
         return self._dog
 
-    def on_socket_request(self, client: SocketModeClient, request: SocketModeRequest):
-        """The Slack SDK listener API is synchronous; schedule our async work."""
-        task = asyncio.create_task(self.process_socket_request(client, request), name='Slack incoming event')
-        Application.TASKS.append(task)
-
-    async def process_socket_request(self, client: SocketModeClient, request: SocketModeRequest):
+    async def on_socket_request(self, client: SocketModeClient, request: SocketModeRequest):
+        """Acknowledge Socket Mode events, then pass normal messages to Dog."""
         """Acknowledge Slack promptly, then pass normal user messages to Dog."""
         if request.type != 'events_api':
             return
@@ -144,15 +139,11 @@ class Slack(Connector):
         Application.tick()
         user_name = user_id
         channel_name = channel_id
-        if self._web:
-            try:
-                user_info = await self._web.users_info(user=user_id)
-                profile = user_info.get('user', {}).get('profile', {})
-                user_name = profile.get('display_name') or profile.get('real_name') or user_id
-                channel_info = await self._web.conversations_info(channel=channel_id)
-                channel_name = channel_info.get('channel', {}).get('name') or channel_id
-            except Exception as ex:
-                Logger.debug(f'Slack metadata lookup skipped: {ex}')
+        # The relay deliberately needs no users:read scope. Slack's stable
+        # member ID is sufficient for identity; known channels retain their
+        # readable name from the connect-time channel bootstrap.
+        if known_channel := self._server.get_channel_by_name(channel_id):
+            channel_name = known_channel.gdo_val('chan_displayname') or channel_id
         user = await self._server.get_or_create_user(user_id, user_name)
         Application.set_current_user(user)
         channel = self._server.get_or_create_channel(channel_id, channel_name)
