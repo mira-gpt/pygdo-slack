@@ -93,7 +93,11 @@ class Slack(Connector):
         await client.send_socket_mode_response(SocketModeResponse(envelope_id=request.envelope_id))
         payload = request.payload or {}
         event = payload.get('event') or {}
-        if event.get('type') != 'message' or event.get('subtype'):
+        event_type = event.get('type')
+        if event_type in ('member_joined_channel', 'member_left_channel'):
+            await self.handle_membership_event(event_type, event)
+            return
+        if event_type != 'message' or event.get('subtype'):
             return
         if event.get('bot_id') or str(event.get('user')) == self._bot_user_id:
             return
@@ -106,6 +110,20 @@ class Slack(Connector):
             await self.handle_message(event, user_id, channel_id, text)
         except Exception as ex:
             Logger.exception(ex, 'Slack incoming message failed.')
+
+    async def handle_membership_event(self, event_type: str, event: dict[str, Any]):
+        """Mirror Slack join/part events into the connector's live user map."""
+        user_id = str(event.get('user') or '')
+        channel_id = str(event.get('channel') or '')
+        if not user_id or not channel_id:
+            return
+        channel = self._server.get_or_create_channel(channel_id, channel_id)
+        user = await self._server.get_or_create_user(user_id, user_id)
+        if event_type == 'member_joined_channel':
+            await self._server.on_user_joined(user, channel)
+            await channel.on_user_joined(user)
+        else:
+            await channel.on_user_left(user)
 
     async def bootstrap_channels(self):
         """Register visible public channels so Dog can send before first inbound text."""
