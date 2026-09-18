@@ -16,7 +16,7 @@ class module_slack(GDO_Module):
     """Slack Socket Mode connector configuration and registration."""
 
     def gdo_module_config(self) -> list[GDT]:
-        values = {'bot_token': '', 'app_token': '', 'signing_secret': ''}
+        values = {'bot_token': '', 'app_token': '', 'signing_secret': '', 'invite_url': ''}
         try:
             with open(self.file_path('secret.toml'), 'r', encoding='utf-8') as file:
                 values.update(tomlkit.load(file).get('slack', {}))
@@ -26,6 +26,7 @@ class module_slack(GDO_Module):
             GDT_Secret('slack_bot_token').initial(str(values['bot_token'])),
             GDT_Secret('slack_app_token').initial(str(values['app_token'])),
             GDT_Secret('slack_signing_secret').initial(str(values['signing_secret'])),
+            GDT_String('slack_invite_url').initial(str(values['invite_url'])),
             GDT_String('slack_display_name').initial('Slack'),
         ]
 
@@ -37,6 +38,9 @@ class module_slack(GDO_Module):
 
     def cfg_signing_secret(self) -> str:
         return self.get_config_val('slack_signing_secret')
+
+    def cfg_invite_url(self) -> str:
+        return self.get_config_val('slack_invite_url')
 
     def cfg_display_name(self) -> str:
         return self.get_config_val('slack_display_name')

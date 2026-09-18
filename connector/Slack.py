@@ -31,6 +31,25 @@ class Slack(Connector):
         self._dog: GDO_User | None = None
         self._bot_user_id: str | None = None
 
+    def server_config_val(self, key: str, fallback: str = '') -> str:
+        """Read connector credentials/settings from this specific server."""
+        from gdo.slack.method.settings import settings
+
+        value = settings().env_server(self._server).get_config_server_val(key)
+        return value or fallback
+
+    def cfg_bot_token(self) -> str:
+        from gdo.slack.module_slack import module_slack
+        return self.server_config_val('slack_bot_token', module_slack.instance().cfg_bot_token())
+
+    def cfg_app_token(self) -> str:
+        from gdo.slack.module_slack import module_slack
+        return self.server_config_val('slack_app_token', module_slack.instance().cfg_app_token())
+
+    def cfg_invite_url(self) -> str:
+        from gdo.slack.module_slack import module_slack
+        return self.server_config_val('slack_invite_url', module_slack.instance().cfg_invite_url())
+
     def get_render_mode(self) -> Mode:
         return Mode.render_slack
 
@@ -38,17 +57,14 @@ class Slack(Connector):
         return False
 
     def render_user_connect_help(self) -> str:
-        return 'Slack workspace'
+        return self.cfg_invite_url() or 'Slack workspace'
 
     async def gdo_connect(self) -> bool:
-        from gdo.slack.module_slack import module_slack
-
-        module = module_slack.instance()
-        if not module.cfg_bot_token() or not module.cfg_app_token():
+        if not self.cfg_bot_token() or not self.cfg_app_token():
             Logger.error('Slack is missing slack_bot_token or slack_app_token.')
             return False
 
-        self._web = AsyncWebClient(token=module.cfg_bot_token())
+        self._web = AsyncWebClient(token=self.cfg_bot_token())
         try:
             identity = await self._web.auth_test()
         except Exception as ex:
@@ -61,7 +77,7 @@ class Slack(Connector):
         await GDO_UserPermission.grant(self._dog, GDO_Permission.ADMIN)
         await GDO_UserPermission.grant(self._dog, GDO_Permission.STAFF)
 
-        self._client = SocketModeClient(app_token=module.cfg_app_token(), web_client=self._web)
+        self._client = SocketModeClient(app_token=self.cfg_app_token(), web_client=self._web)
         self._client.socket_mode_request_listeners.append(self.on_socket_request)
         try:
             await self._client.connect()
