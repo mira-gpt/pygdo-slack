@@ -32,7 +32,7 @@ class Slack(Connector):
         self._bot_user_id: str | None = None
 
     def get_render_mode(self) -> Mode:
-        return Mode.render_markdown
+        return Mode.render_slack
 
     def gdo_needs_authentication(self) -> bool:
         return False
