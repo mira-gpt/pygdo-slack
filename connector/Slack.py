@@ -127,6 +127,14 @@ class Slack(Connector):
             for item in response.get('channels', []):
                 channel_id = item.get('id')
                 if channel_id:
+                    # A visible public channel is not necessarily one the bot
+                    # can post to. Join it once so outbound PyGDO relay is
+                    # available before the first inbound Slack message.
+                    if not item.get('is_member'):
+                        try:
+                            await self._web.conversations_join(channel=str(channel_id))
+                        except Exception as ex:
+                            Logger.error(f'Slack cannot join {channel_id}: {ex}')
                     self._server.get_or_create_channel(str(channel_id), item.get('name') or str(channel_id))
             cursor = response.get('response_metadata', {}).get('next_cursor') or None
             if not cursor:
