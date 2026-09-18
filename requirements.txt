@@ -1,0 +1,2 @@
+slack-sdk>=3.27,<4
+aiohttp>=3.9,<4
