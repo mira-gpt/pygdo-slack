@@ -197,7 +197,8 @@ class Slack(Connector):
         channel = message._env_channel
         if not channel:
             return
-        await self.send_to_conversation(channel.get_name(), message._result, message._env_reply_to)
+        reply_to = message._env_reply_to if message.wants_sender_prefix() else None
+        await self.send_to_conversation(channel.get_name(), message._result, reply_to)
 
     async def gdo_send_to_user(self, message: Message, notice: bool = False):
         await self.send_to_conversation(message._env_user.get_name(), message._result, message._env_reply_to)
